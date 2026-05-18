@@ -1,7 +1,34 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdmission } from '../data/admissionContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, Tooltip as ReTooltip, Cell, Treemap } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+
+const departmentShortNames: Record<string, string> = {
+  'Electronics and Communication Engineering': 'ECE',
+  'Electrical and Electronics Engineering': 'EEE',
+  'Mechanical Engineering': 'Mech',
+  'Computer Science Engineering': 'CSE',
+  'Civil Engineering': 'CE'
+};
+
+const getDepartmentLabel = (name: string) => departmentShortNames[name] || name
+  .split(' ')
+  .map((part) => part[0])
+  .join('')
+  .toUpperCase()
+  .slice(0, 4);
+
+const chartTooltipStyle = {
+  background: '#0f172a',
+  border: '1px solid rgba(148, 163, 184, 0.16)',
+  color: '#e2e8f0',
+  fontSize: '13px',
+  padding: '12px',
+  borderRadius: '8px',
+  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.4)'
+};
+
+const tooltipFormatter = (value: number | string, name: string) => [value, typeof name === 'string' ? name : 'Value'];
 
 export default function Departments() {
   const { departments, students } = useAdmission();
@@ -23,16 +50,25 @@ export default function Departments() {
     });
   }, [departments, students]);
 
-  const occupancyData = departmentData.map((dept) => ({ name: dept.departmentName, filled: dept.seatsFilled, remaining: dept.remainingSeats }));
-  const funnelData = departmentData.map((dept) => ({ name: dept.departmentName, value: dept.studentCount }));
-  const genderDistribution = departments.map((dept) => {
-    const male = students.filter((student) => student.departmentId === dept.id && student.gender === 'Male').length;
-    const female = students.filter((student) => student.departmentId === dept.id && student.gender === 'Female').length;
-    return { name: dept.departmentName, male, female };
-  }).flatMap((dept) => [
-    { name: `${dept.name} - Male`, value: dept.male },
-    { name: `${dept.name} - Female`, value: dept.female }
-  ]);
+  const occupancyData = departmentData.map((dept) => ({
+    name: getDepartmentLabel(dept.departmentName),
+    filled: dept.seatsFilled,
+    remaining: dept.remainingSeats
+  }));
+
+  const preferenceData = departmentData
+    .map((dept) => ({ name: getDepartmentLabel(dept.departmentName), value: dept.studentCount }))
+    .sort((a, b) => b.value - a.value);
+
+  const quotaDistribution = departments.map((dept) => {
+    const management = students.filter((student) => student.departmentId === dept.id && student.quota === 'Management Quota').length;
+    const counselling = students.filter((student) => student.departmentId === dept.id && student.quota === 'Counselling Quota').length;
+    return {
+      name: getDepartmentLabel(dept.departmentName),
+      management,
+      counselling
+    };
+  });
 
   const trendData = Array.from({ length: 7 }, (_, index) => ({
     date: `Week ${index + 1}`,
@@ -63,13 +99,13 @@ export default function Departments() {
         <div className="card chart-card">
           <div className="section-title"><h3>Department Seat Occupancy</h3></div>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={occupancyData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+            <BarChart data={occupancyData} margin={{ top: 24, right: 32, left: 0, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="name" tick={{ fill: '#cbd5e1' }} />
+              <XAxis dataKey="name" tick={{ fill: '#cbd5e1' }} angle={-45} textAnchor="end" height={80} />
               <YAxis tick={{ fill: '#cbd5e1' }} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.16)' }} />
-              <Bar dataKey="filled" stackId="a" fill="#34d399" radius={[10, 10, 0, 0]} />
-              <Bar dataKey="remaining" stackId="a" fill="#4f8bff" radius={[0, 0, 10, 10]} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={tooltipFormatter} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} wrapperStyle={{ zIndex: 99 }} cursor={{ fill: 'rgba(79, 139, 255, 0.1)' }} />
+              <Bar dataKey="filled" stackId="a" fill="#34d399" radius={[10, 10, 0, 0]} isAnimationActive />
+              <Bar dataKey="remaining" stackId="a" fill="#4f8bff" radius={[0, 0, 10, 10]} isAnimationActive />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -77,14 +113,13 @@ export default function Departments() {
         <div className="card chart-card">
           <div className="section-title"><h3>Department Preference Ranking</h3></div>
           <ResponsiveContainer width="100%" height={280}>
-            <FunnelChart>
-              <Funnel dataKey="value" data={funnelData} isAnimationActive>
-                {funnelData.map((entry, index) => (
-                  <Cell key={entry.name} fill={index % 2 === 0 ? '#4f8bff' : '#34d399'} />
-                ))}
-              </Funnel>
-              <ReTooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.16)' }} />
-            </FunnelChart>
+            <BarChart data={preferenceData} layout="vertical" margin={{ top: 12, right: 32, left: 12, bottom: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis type="number" tick={{ fill: '#cbd5e1' }} />
+              <YAxis type="category" dataKey="name" tick={{ fill: '#cbd5e1' }} width={120} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={tooltipFormatter} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} wrapperStyle={{ zIndex: 99 }} cursor={{ fill: 'rgba(79, 139, 255, 0.1)' }} />
+              <Bar dataKey="value" fill="#4f8bff" radius={[10, 10, 10, 10]} isAnimationActive />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -93,20 +128,28 @@ export default function Departments() {
         <div className="card chart-card">
           <div className="section-title"><h3>Admission Trend by Date</h3></div>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={trendData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+            <BarChart data={trendData} margin={{ top: 24, right: 32, left: 0, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="date" tick={{ fill: '#cbd5e1' }} />
+              <XAxis dataKey="date" tick={{ fill: '#cbd5e1' }} angle={-45} textAnchor="end" height={80} />
               <YAxis tick={{ fill: '#cbd5e1' }} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.16)' }} />
-              <Bar dataKey="applications" fill="#f9a826" radius={[10, 10, 0, 0]} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={tooltipFormatter} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} wrapperStyle={{ zIndex: 99 }} cursor={{ fill: 'rgba(249, 168, 38, 0.1)' }} />
+              <Bar dataKey="applications" fill="#f9a826" radius={[10, 10, 0, 0]} isAnimationActive />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="card chart-card">
-          <div className="section-title"><h3>Department-wise Gender Distribution</h3></div>
+          <div className="section-title"><h3>Department-wise Quota Distribution</h3></div>
           <ResponsiveContainer width="100%" height={280}>
-            <Treemap data={genderDistribution} dataKey="value" nameKey="name" stroke="#fff" fill="#4f8bff" />
+            <BarChart data={quotaDistribution} margin={{ top: 24, right: 32, left: 0, bottom: 40 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="name" tick={{ fill: '#cbd5e1' }} angle={-45} textAnchor="end" height={80} />
+              <YAxis tick={{ fill: '#cbd5e1' }} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={tooltipFormatter} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} wrapperStyle={{ zIndex: 99 }} cursor={{ fill: 'rgba(79, 139, 255, 0.1)' }} />
+              <Legend wrapperStyle={{ color: '#cbd5e1' }} />
+              <Bar dataKey="management" stackId="a" fill="#34d399" radius={[10, 10, 0, 0]} isAnimationActive />
+              <Bar dataKey="counselling" stackId="a" fill="#4f8bff" radius={[0, 0, 10, 10]} isAnimationActive />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>

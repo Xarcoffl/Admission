@@ -35,8 +35,13 @@ router.post('/', requireRole('admin', 'officer'), async (req: AuthRequest, res) 
   try {
     const student: Student = req.body;
     const newStudent = await dataStore.createStudent(student);
-    io.emit('studentCreated', newStudent);
-    res.status(201).json(newStudent);
+    // If the DB helper returns the created student, emit and return it; otherwise fall back to 201 without body
+    if (newStudent) {
+      io.emit('studentCreated', newStudent);
+      return res.status(201).json(newStudent);
+    }
+    io.emit('studentCreated', student);
+    res.status(201).json(student);
   } catch (error) {
     console.error('Error creating student:', error);
     res.status(500).json({ error: 'Internal server error' });

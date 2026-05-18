@@ -100,11 +100,15 @@ export const dbOperations = {
   // Students
   getAllStudents: () => dbAll('SELECT * FROM students ORDER BY created_at DESC'),
   getStudentById: (id: string) => dbGet('SELECT * FROM students WHERE id = ?', [id]),
-  createStudent: (student: any) => dbRun(
-    `INSERT INTO students (id, applicationId, studentName, gender, dob, mobile, email, district, schoolName, boardType, community, cutoffMark, departmentId, admissionStatus, applicationDate, quota)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [student.id, student.applicationId, student.studentName, student.gender, student.dob, student.mobile, student.email, student.district, student.schoolName, student.boardType, student.community, student.cutoffMark, student.departmentId, student.admissionStatus, student.applicationDate, student.quota]
-  ),
+  createStudent: async (student: any) => {
+    await dbRun(
+      `INSERT INTO students (id, applicationId, studentName, gender, dob, mobile, email, district, schoolName, boardType, community, cutoffMark, departmentId, admissionStatus, applicationDate, quota)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [student.id, student.applicationId, student.studentName, student.gender, student.dob, student.mobile, student.email, student.district, student.schoolName, student.boardType, student.community, student.cutoffMark, student.departmentId, student.admissionStatus, student.applicationDate, student.quota]
+    );
+    // Return the created student row
+    return await dbGet('SELECT * FROM students WHERE id = ?', [student.id]);
+  },
   updateStudent: async (id: string, student: any) => {
     try {
       await dbRun(

@@ -10,12 +10,13 @@ type AdmissionContextValue = {
   user: { id: string; username: string; role: string } | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  updateStudent: (student: Student) => Promise<void>;
-  addStudent: (student: Student) => Promise<void>;
-  removeStudent: (studentId: string) => Promise<void>;
+  updateStudent: (student: Student) => Promise<Student | null>;
+  addStudent: (student: Student) => Promise<Student | null>;
+  removeStudent: (studentId: string) => Promise<boolean>;
   updateDepartment: (department: Department) => Promise<void>;
   addDepartment: (department: Department) => Promise<void>;
   removeDepartment: (departmentId: string) => Promise<void>;
+  refreshData: () => Promise<void>;
   lastRefreshed: string;
 };
 
@@ -121,6 +122,11 @@ export function AdmissionProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshData = async () => {
+    await Promise.all([fetchStudents(), fetchDepartments()]);
+    setLastRefreshed(new Date().toLocaleString());
+  };
+
   useEffect(() => {
     if (user) {
       fetchStudents();
@@ -170,9 +176,18 @@ export function AdmissionProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(student)
         });
         if (response.ok) {
-          // Real-time update will be handled by Socket.io
-          setLastRefreshed(new Date().toLocaleString());
+          try {
+            const created = await response.json();
+            // Update local state immediately so imports show up without relying on sockets
+            setStudents((prev) => [...prev, created]);
+            setLastRefreshed(new Date().toLocaleString());
+            return created;
+          } catch (e) {
+            setLastRefreshed(new Date().toLocaleString());
+            return null;
+          }
         }
+        return null;
       },
       updateStudent: async (student: Student) => {
         const response = await fetch(`${API_BASE}/students/${student.id}`, {
@@ -181,9 +196,17 @@ export function AdmissionProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(student)
         });
         if (response.ok) {
-          // Real-time update will be handled by Socket.io
-          setLastRefreshed(new Date().toLocaleString());
+          try {
+            const updated = await response.json();
+            setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+            setLastRefreshed(new Date().toLocaleString());
+            return updated;
+          } catch (e) {
+            setLastRefreshed(new Date().toLocaleString());
+            return null;
+          }
         }
+        return null;
       },
       removeStudent: async (studentId: string) => {
         const response = await fetch(`${API_BASE}/students/${studentId}`, {
@@ -191,9 +214,12 @@ export function AdmissionProvider({ children }: { children: ReactNode }) {
           headers: getAuthHeaders()
         });
         if (response.ok) {
-          // Real-time update will be handled by Socket.io
+          // Update local state immediately so UI reflects deletion
+          setStudents((prev) => prev.filter((s) => s.id !== studentId));
           setLastRefreshed(new Date().toLocaleString());
+          return true;
         }
+        return false;
       },
       addDepartment: async (department: Department) => {
         const response = await fetch(`${API_BASE}/departments`, {
@@ -227,6 +253,7 @@ export function AdmissionProvider({ children }: { children: ReactNode }) {
           setLastRefreshed(new Date().toLocaleString());
         }
       },
+      refreshData,
       lastRefreshed
     }),
     [students, departments, user, lastRefreshed]

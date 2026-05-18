@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAdmission } from '../data/admissionContext';
 import { Student, Department } from '../data/mockData';
@@ -39,6 +39,20 @@ export default function StudentForm() {
   });
 
   const departmentOptions = useMemo(() => departments, [departments]);
+
+  // If we're editing an existing student, sync the form state when the student data arrives
+  useEffect(() => {
+    if (existing) {
+      setForm((prev) => ({ ...prev, ...existing }));
+    }
+  }, [existing]);
+
+  // Ensure a default departmentId is selected once departments load for new students
+  useEffect(() => {
+    if (!existing && departments[0] && !form.departmentId) {
+      setForm((prev) => ({ ...prev, departmentId: departments[0].id }));
+    }
+  }, [departments, existing]);
 
   const handleChange = (key: keyof Student, value: string | number) => {
     setForm((current) => ({ ...current, [key]: value }));
